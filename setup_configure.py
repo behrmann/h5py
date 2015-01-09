@@ -136,7 +136,42 @@ def autodetect_includedirs(hdf5_includedir=None, mpi=None):
     return includedirs
 
 
-def autodetect_version(libdirs, mpi=None, hdf5_version=None):
+def autodetect_libname(hdf5_libname=None, mpi=None):
+    """
+    Get namelibrary file of hdf5 library.
+
+    Intended for Unix-ish platforms (Linux, OS X, BSD).
+    Does not support Windows.
+
+    hdf5_dir: optional HDF5 library name
+    mpi     : optional switch whether to look for parallel library version
+    """
+    if hdf5_libname is not None:
+        libname = [hdf5_libname, hdf5_libname + '_hl']
+        libnameregexp = re.compile(r'lib' + hdf5_libname + r'.so')
+    else:
+        if sys.platform.startswith('darwin'):
+            libname = None
+            libnameregexp = re.compile(r'^libhdf5.dylib')
+        elif sys.platform.startswith('linux'):
+            if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
+                if mpi:
+                    libname = ['hdf5_openmpi', 'hdf5_openmpi_hl']
+                    libnameregexp = re.compile(r'^libhdf5_openmpi.so')
+                else:
+                    libname = ['hdf5_serial', 'hdf5_serial_hl']
+                    libnameregexp = re.compile(r'^libhdf5_serial.so')
+            else:
+                libname = None
+                libnameregexp = re.compile(r'^libhdf5.so')
+        else:
+            libname = None
+            libnameregexp = re.compile(r'^libhdf5.so')
+
+    return libname, libnameregexp
+
+
+def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
     """
     Detect the current version of HDF5, and return X.Y.Z version string and path
 
@@ -149,23 +184,10 @@ def autodetect_version(libdirs, mpi=None, hdf5_version=None):
     import ctypes
     from ctypes import byref
 
-    if sys.platform.startswith('darwin'):
-        regexp = re.compile(r'^libhdf5.dylib')
-    elif sys.platform.startswith('linux'):
-        if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
-            if mpi:
-                regexp = re.compile(r'^libhdf5_openmpi.so')
-            else:
-                regexp = re.compile(r'^libhdf5_serial.so')
-        else:
-            regexp = re.compile(r'^libhdf5.so')
-    else:
-        regexp = re.compile(r'^libhdf5.so')
-
     librarypath = None
     for d in libdirs:
         try:
-            candidates = [x for x in os.listdir(d) if regexp.match(x)]
+            candidates = [x for x in os.listdir(d) if libnameregexp.match(x)]
         except Exception:
             continue   # Skip invalid entries
 
@@ -209,21 +231,14 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
     else:
         libdirs = autodetect_libdirs(hdf5_dir, mpi)
 
-    version = autodetect_version(libdirs, mpi, hdf5_version)
+    libname, libnameregexp = autodetect_libname(hdf5_libname, mpi)
+
+    version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
 
     if hdf5_includedir is not None:
         includedirs = autodetect_includedirs(hdf5_includedir, mpi)
     else:
         includedirs = autodetect_includedirs(hdf5_dir, mpi)
-
-    if sys.platform.startswith('linux'):
-        if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
-            if mpi:
-                libname = ['hdf5_openmpi', 'hdf5_openmpi_hl']
-            else:
-                libname = ['hdf5_serial', 'hdf5_serial_hl']
-    else:
-        libname = None
 
     return (libdirs, includedirs, version, libname)
 
@@ -417,7 +432,7 @@ class configure(Command):
         print("Path to HDF5 library: " + repr(self.hdf5_libdir))
         print("Path to HDF5 headers: " + repr(self.hdf5_includedir))
         if self.hdf5_libname is not None:
-            print("  HDF5 library names: " + repr(self.hdf5_libname[0] + ".so"))
+            print("  HDF5 library names: " + repr(self.hdf5_libname[0]))
         print("        HDF5 Version: " + repr(self.hdf5_version))
         print("         MPI Enabled: " + repr(bool(self.mpi)))
         print("    Rebuild Required: " + repr(bool(self.rebuild_required)))
