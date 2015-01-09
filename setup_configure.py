@@ -239,7 +239,7 @@ class EnvironmentOptions(object):
         self.hdf5_version = os.environ.get('HDF5_VERSION')
         self.hdf5_libdir = os.environ.get('HDF5_LIB')
         self.hdf5_libname = os.environ.get('HDF5_LIBNAME')
-        self.hdf5_incluedir = os.environ.get('HDF5_INCLUDE')
+        self.hdf5_includedir = os.environ.get('HDF5_INCLUDE')
         self.mpi = os.environ.get('HDF5_MPI')
         if self.hdf5_version is not None:
             validate_version(self.hdf5_version)
@@ -293,21 +293,6 @@ class configure(Command):
         dct['rebuild'] = False
         savepickle(dct)
 
-    def _update_specified_settings(self, attr, dct, env):
-        if self.__getattribute__(attr) is not None:
-            dct['cmd_' + attr] = self.__getattribute__(attr)
-        if env.__getattribute__(attr) is not None:
-            dct['env_' + attr] = env.__getattribute__(attr)
-        return dct
-
-    def _update_by_priority(self, attr, oldsettings, env):
-        if self.__getattribute__(attr) is None:
-            self._settattr__(attr, oldsettings.get('cmd_' + attr))
-        if self.__getattribute__(attr) is None:
-            self._settattr__(attr, env.__getattribute__(attr))
-        if self.__getattribute__(attr) is None:
-            self._settattr__(attr, oldsettings.get('env_' + attr))
-
     def run(self):
         """ Distutils calls this when the command is run """
 
@@ -320,41 +305,35 @@ class configure(Command):
 
         # Only update settings which have actually been specified this
         # round; ignore the others (which have value None).
-        dct = self._update_specified_settings('hdf5', dct, env)
-        dct = self._update_specified_settings('hdf5_libdir', dct, env)
-        dct = self._update_specified_settings('hdf5_libname', dct, env)
-        dct = self._update_specified_settings('hdf5_includedir', dct, env)
-        dct = self._update_specified_settings('hdf5_version', dct, env)
-        dct = self._update_specified_settings('mpi', dct, env)
-        # if self.hdf5 is not None:
-        #     dct['cmd_hdf5'] = self.hdf5
-        # if env.hdf5 is not None:
-        #     dct['env_hdf5'] = env.hdf5
+        if self.hdf5 is not None:
+            dct['cmd_hdf5'] = self.hdf5
+        if env.hdf5 is not None:
+            dct['env_hdf5'] = env.hdf5
 
-        # if self.hdf5_libdir is not None:
-        #     dct['cmd_hdf5_libdir'] = self.hdf5_libdir
-        # if env.hdf5_libdir is not None:
-        #     dct['env_hdf5_libdir'] = env.hdf5_libdir
+        if self.hdf5_libdir is not None:
+            dct['cmd_hdf5_libdir'] = self.hdf5_libdir
+        if env.hdf5_libdir is not None:
+            dct['env_hdf5_libdir'] = env.hdf5_libdir
 
-        # if self.hdf5_libname is not None:
-        #     dct['cmd_hdf5_libname'] = self.hdf5_libname
-        # if env.hdf5_libname is not None:
-        #     dct['env_hdf5_libname'] = env.hdf5_libname
+        if self.hdf5_libname is not None:
+            dct['cmd_hdf5_libname'] = self.hdf5_libname
+        if env.hdf5_libname is not None:
+            dct['env_hdf5_libname'] = env.hdf5_libname
 
-        # if self.hdf5_includedir is not None:
-        #     dct['cmd_hdf5_includedir'] = self.hdf5_includedir
-        # if env.hdf5_includedir is not None:
-        #     dct['env_hdf5_includedir'] = env.hdf5_includedir
+        if self.hdf5_includedir is not None:
+            dct['cmd_hdf5_includedir'] = self.hdf5_includedir
+        if env.hdf5_includedir is not None:
+            dct['env_hdf5_includedir'] = env.hdf5_includedir
 
-        # if self.hdf5_version is not None:
-        #     dct['cmd_hdf5_version'] = self.hdf5_version
-        # if env.hdf5_version is not None:
-        #     dct['env_hdf5_version'] = env.hdf5_version
+        if self.hdf5_version is not None:
+            dct['cmd_hdf5_version'] = self.hdf5_version
+        if env.hdf5_version is not None:
+            dct['env_hdf5_version'] = env.hdf5_version
 
-        # if self.mpi is not None:
-        #     dct['cmd_mpi'] = self.mpi
-        # if env.mpi is not None:
-        #     dct['env_mpi'] = env.mpi
+        if self.mpi is not None:
+            dct['cmd_mpi'] = self.mpi
+        if env.mpi is not None:
+            dct['env_mpi'] = env.mpi
 
         self.rebuild_required = dct.get('rebuild') or dct != oldsettings
 
@@ -369,61 +348,54 @@ class configure(Command):
 
         # Step 2: update public config attributes according to priority rules
 
-        self._update_by_priority('hdf5', oldsettings, env)
-        self._update_by_priority('hdf5_libdir', oldsettings, env)
-        self._update_by_priority('hdf5_libname', oldsettings, env)
-        self._update_by_priority('hdf5_includedir', oldsettings, env)
-        self._update_by_priority('hdf5_version', oldsettings, env)
-        self._update_by_priority('mpi', oldsettings, env)
+        if self.hdf5 is None:
+            self.hdf5 = oldsettings.get('cmd_hdf5')
+        if self.hdf5 is None:
+            self.hdf5 = env.hdf5
+        if self.hdf5 is None:
+            self.hdf5 = oldsettings.get('env_hdf5')
 
-        # if self.hdf5 is None:
-        #     self.hdf5 = oldsettings.get('cmd_hdf5')
-        # if self.hdf5 is None:
-        #     self.hdf5 = env.hdf5
-        # if self.hdf5 is None:
-        #     self.hdf5 = oldsettings.get('env_hdf5')
+        if self.hdf5_libdir is None:
+            self.hdf5_libdir = oldsettings.get('cmd_hdf5_libdir')
+        if self.hdf5_libdir is None:
+            self.hdf5_libdir = env.hdf5_libdir
+        if self.hdf5_libdir is None:
+            self.hdf5_libdir = oldsettings.get('env_hdf5_libdir')
 
-        # if self.hdf5_libdir is None:
-        #     self.hdf5_libdir = oldsettings.get('cmd_hdf5_libdir')
-        # if self.hdf5_libdir is None:
-        #     self.hdf5_libdir = env.hdf5_libdir
-        # if self.hdf5_libdir is None:
-        #     self.hdf5_libdir = oldsettings.get('env_hdf5_libdir')
+        if self.hdf5_libname is None:
+            self.hdf5_libname = oldsettings.get('cmd_hdf5_libname')
+        if self.hdf5_libname is None:
+            self.hdf5_libname = env.hdf5_libname
+        if self.hdf5_libname is None:
+            self.hdf5_libname = oldsettings.get('env_hdf5_libname')
 
-        # if self.hdf5_libname is None:
-        #     self.hdf5_libname = oldsettings.get('cmd_hdf5_libname')
-        # if self.hdf5_libname is None:
-        #     self.hdf5_libname = env.hdf5_libname
-        # if self.hdf5_libname is None:
-        #     self.hdf5_libname = oldsettings.get('env_hdf5_libname')
+        if self.hdf5_includedir is None:
+            self.hdf5_includedir = oldsettings.get('cmd_hdf5_includedir')
+        if self.hdf5_includedir is None:
+            self.hdf5_includedir = env.hdf5_includedir
+        if self.hdf5_includedir is None:
+            self.hdf5_includedir = oldsettings.get('env_hdf5_includedir')
 
-        # if self.hdf5_includedir is None:
-        #     self.hdf5_includedir = oldsettings.get('cmd_hdf5_includedir')
-        # if self.hdf5_includedir is None:
-        #     self.hdf5_includedir = env.hdf5_includedir
-        # if self.hdf5_includedir is None:
-        #     self.hdf5_includedir = oldsettings.get('env_hdf5_includedir')
+        if self.hdf5_version is None:
+            self.hdf5_version = oldsettings.get('cmd_hdf5_version')
+        if self.hdf5_version is None:
+            self.hdf5_version = env.hdf5_version
+        if self.hdf5_version is None:
+            self.hdf5_version = oldsettings.get('env_hdf5_version')
 
-        # if self.hdf5_version is None:
-        #     self.hdf5_version = oldsettings.get('cmd_hdf5_version')
-        # if self.hdf5_version is None:
-        #     self.hdf5_version = env.hdf5_version
-        # if self.hdf5_version is None:
-        #     self.hdf5_version = oldsettings.get('env_hdf5_version')
-
-        # if self.mpi is None:
-        #     self.mpi = oldsettings.get('cmd_mpi')
-        # if self.mpi is None:
-        #     self.mpi = env.mpi
-        # if self.mpi is None:
-        #     self.mpi = oldsettings.get('env_mpi')
+        if self.mpi is None:
+            self.mpi = oldsettings.get('cmd_mpi')
+        if self.mpi is None:
+            self.mpi = env.mpi
+        if self.mpi is None:
+            self.mpi = oldsettings.get('env_mpi')
 
         if self.hdf5_version is None:
             try:
                 versioninfo = autodetect_hdf5(self.hdf5,
                                               self.hdf5_libdir,
                                               self.hdf5_libname,
-                                              self.hdf5_incluedir,
+                                              self.hdf5_includedir,
                                               self.hdf5_version,
                                               self.mpi)
                 self.hdf5_libdir = versioninfo[0]
