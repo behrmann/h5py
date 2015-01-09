@@ -45,7 +45,7 @@ if sys.platform.startswith('win'):
 else:
     COMPILER_SETTINGS = {
        'libraries'      : ['hdf5', 'hdf5_hl'],
-       'include_dirs'   : [localpath('lzf'), '/opt/local/include', '/usr/local/include'],
+       'include_dirs'   : [localpath('lzf')],
        'library_dirs'   : ['/opt/local/lib', '/usr/local/lib'],
        'define_macros'  : [('H5_USE_16_API', None)] }
 
@@ -79,10 +79,10 @@ class h5py_build_ext(build_ext):
         # Ensure a custom location appears first, so we don't get a copy of
         # HDF5 from some default location in COMPILER_SETTINGS
         if config.hdf5_libdir is not None:
-            settings['library_dirs'].insert(0, config.hdf5_libdir)
+            settings['library_dirs'] += config.hdf5_libdir
 
         if config.hdf5_includedir is not None:
-            settings['include_dirs'].insert(0, config.hdf5_includedir)
+            settings['include_dirs'] += config.hdf5_includedir
 
         if config.hdf5_libname is not None:
             settings['libraries'] = config.hdf5_libname

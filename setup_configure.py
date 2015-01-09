@@ -52,37 +52,57 @@ def validate_version(s):
         raise ValueError("HDF5 version string must be in X.Y.Z format")
 
 
-def autodetect_libdirs(hdf5_dir=None, mpi=None):
+def autodetect_libdirs(hdf5_libdir=None, mpi=None):
     """
     Detect the lib directories of the wanted hdf5 library.
 
     Intended for Unix-ish platforms (Linux, OS X, BSD).
     Does not support Windows.
 
-    hdf5_dir: optional HDF5 install directory to look in (containing "lib")
-    mpi     : optional switch whether to look for parallel library version
+    hdf5_libdir: optional directory where to look for libhdf5
+    mpi        : optional switch whether to look for parallel library version
     """
     libdirs = ['/usr/local/lib', '/opt/local/lib']
-    if sys.platform.startswith('linux'):
-        # This is Debian specific but could work for ubuntu too
-        if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
-            # Debian is multilib so libraries are sorted by their architecture
-            debianlibdir = op.join('/usr/lib', platform.uname()[4] + '-linux-gnu')
-            libdirs.append(debianlibdir)
+
+    # given parameters get precedence
+    if hdf5_libdir is not None:
+        if not hdf5_libdir.endswith('/lib'):
+            libdirs.insert(0, op.join(hdf5_libdir, 'lib'))
         else:
+            libdirs.insert(0, hdf5_libdir)
+    else:
+        try:
+            # first try to get information the canonical way
+            import subprocess
+
+            # get path of ldconfig, e.g.
+            # ldconfig: /sbin/ldconfig /sbin/ldconfig.real /usr/share/man/man8/ldconfig.8.gz
+            ldconfigpath = subprocess.check_output(['whereis', 'ldconfig']).split()[1]
+
+            if sys.platform.startswith('linux'):
+                listswitch = '-p'
+            elif 'freebsd' in sys.platform:
+                listswitch = '-r'
+
+            ldconfig_out = subprocess.check_output([ldconfigpath, listswitch])
+            ldconfig_out = ldconfig_out.split()
+            libdirs = list(set(op.dirname(line) for line in ldconfig_out
+                               if 'libhdf5' in line and op.dirname(line) != ''))
+
+        except OSError:
+            # try pkgconfig as the last fall back, since its information
+            # can be inaccurate, e.g. it does not find mpi-enabled libhdf5
+            # on debian systems
             try:
-                 if pkgconfig.exists("hdf5"):
-                     libdirs.append(pkgconfig.parse("hdf5")['library_dirs'].pop())
+                if pkgconfig.exists("hdf5"):
+                    libdirs.append(pkgconfig.parse("hdf5")['library_dirs'].pop())
             except EnvironmentError:
                 pass
-
-    if hdf5_dir is not None:
-        libdirs.insert(0, op.join(hdf5_dir, 'lib'))
 
     return libdirs
 
 
-def autodetect_includedirs(hdf5_dir=None, mpi=None):
+def autodetect_includedirs(hdf5_includedir=None, mpi=None):
     """
     Detect the include directories of the wanted hdf5 library.
 
@@ -92,27 +112,31 @@ def autodetect_includedirs(hdf5_dir=None, mpi=None):
     hdf5_dir: optional HDF5 install directory to look in (containing "include")
     mpi     : optional switch whether to look for parallel library version
     """
-    includedirs = []
-    if sys.platform.startswith('linux'):
-        if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
-            if mpi:
-                includedirs.append('/usr/include/hdf5/openmpi')
-            else:
-                includedirs.append('/usr/include/hdf5/serial')
-        else:
-            try:
-                 if pkgconfig.exists("hdf5"):
-                     includedirs.append(pkgconfig.parse("hdf5")['include_dirs'].pop())
-            except EnvironmentError:
-                pass
+    includedirs = ['/usr/local/include', '/opt/local/include']
 
-    if hdf5_dir is not None:
-        includedirs.insert(0, op.join(hdf5_dir, 'include'))
+    if hdf5_includedir is not None:
+        if not hdf5_includedir.endswith('/include'):
+            includedirs.insert(0, op.join(hdf5_includedir, 'include'))
+        else:
+            includedirs.insert(0, hdf5_includedir)
+    else:
+        if sys.platform.startswith('linux'):
+            if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
+                if mpi:
+                    includedirs = ['/usr/include/hdf5/openmpi']
+                else:
+                    includedirs = ['/usr/include/hdf5/serial']
+            else:
+                try:
+                    if pkgconfig.exists("hdf5"):
+                        includedirs += list(pkgconfig.parse("hdf5")['include_dirs'])
+                except EnvironmentError:
+                    pass
 
     return includedirs
 
 
-def autodetect_version(libdirs, mpi=None):
+def autodetect_version(libdirs, mpi=None, hdf5_version=None):
     """
     Detect the current version of HDF5, and return X.Y.Z version string and path
 
@@ -163,7 +187,10 @@ def autodetect_version(libdirs, mpi=None):
 
     version = "{0}.{1}.{2}".format(int(major.value), int(minor.value), int(release.value))
 
-    return (version, op.dirname(librarypath))
+    if hdf5_version is not None:
+        assert hdf5_version == version
+
+    return version
 
 
 def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
@@ -177,11 +204,17 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
     hdf5_dir: optional HDF5 install directory to look in (containing "include")
     mpi     : optional switch whether to look for parallel library version
     """
-    candidate_libdirs = autodetect_libdirs(hdf5_dir, mpi)
+    if hdf5_libdir is not None:
+        libdirs = autodetect_libdirs(hdf5_libdir, mpi)
+    else:
+        libdirs = autodetect_libdirs(hdf5_dir, mpi)
 
-    version, libdir = autodetect_version(candidate_libdirs, mpi)
+    version = autodetect_version(libdirs, mpi, hdf5_version)
 
-    includedir = autodetect_includedirs(hdf5_dir, mpi)[0]
+    if hdf5_includedir is not None:
+        includedirs = autodetect_includedirs(hdf5_includedir, mpi)
+    else:
+        includedirs = autodetect_includedirs(hdf5_dir, mpi)
 
     if sys.platform.startswith('linux'):
         if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
@@ -192,7 +225,7 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
     else:
         libname = None
 
-    return (libdir, includedir, version, libname)
+    return (libdirs, includedirs, version, libname)
 
 
 class EnvironmentOptions(object):
@@ -260,6 +293,21 @@ class configure(Command):
         dct['rebuild'] = False
         savepickle(dct)
 
+    def _update_specified_settings(self, attr, dct, env):
+        if self.__getattribute__(attr) is not None:
+            dct['cmd_' + attr] = self.__getattribute__(attr)
+        if env.__getattribute__(attr) is not None:
+            dct['env_' + attr] = env.__getattribute__(attr)
+        return dct
+
+    def _update_by_priority(self, attr, oldsettings, env):
+        if self.__getattribute__(attr) is None:
+            self._settattr__(attr, oldsettings.get('cmd_' + attr))
+        if self.__getattribute__(attr) is None:
+            self._settattr__(attr, env.__getattribute__(attr))
+        if self.__getattribute__(attr) is None:
+            self._settattr__(attr, oldsettings.get('env_' + attr))
+
     def run(self):
         """ Distutils calls this when the command is run """
 
@@ -272,35 +320,41 @@ class configure(Command):
 
         # Only update settings which have actually been specified this
         # round; ignore the others (which have value None).
-        if self.hdf5 is not None:
-            dct['cmd_hdf5'] = self.hdf5
-        if env.hdf5 is not None:
-            dct['env_hdf5'] = env.hdf5
+        dct = self._update_specified_settings('hdf5', dct, env)
+        dct = self._update_specified_settings('hdf5_libdir', dct, env)
+        dct = self._update_specified_settings('hdf5_libname', dct, env)
+        dct = self._update_specified_settings('hdf5_includedir', dct, env)
+        dct = self._update_specified_settings('hdf5_version', dct, env)
+        dct = self._update_specified_settings('mpi', dct, env)
+        # if self.hdf5 is not None:
+        #     dct['cmd_hdf5'] = self.hdf5
+        # if env.hdf5 is not None:
+        #     dct['env_hdf5'] = env.hdf5
 
-        if self.hdf5_libdir is not None:
-            dct['cmd_hdf5_libdir'] = self.hdf5_libdir
-        if env.hdf5_libdir is not None:
-            dct['env_hdf5_libdir'] = env.hdf5_libdir
+        # if self.hdf5_libdir is not None:
+        #     dct['cmd_hdf5_libdir'] = self.hdf5_libdir
+        # if env.hdf5_libdir is not None:
+        #     dct['env_hdf5_libdir'] = env.hdf5_libdir
 
-        if self.hdf5_libname is not None:
-            dct['cmd_hdf5_libname'] = self.hdf5_libname
-        if env.hdf5_libname is not None:
-            dct['env_hdf5_libname'] = env.hdf5_libname
+        # if self.hdf5_libname is not None:
+        #     dct['cmd_hdf5_libname'] = self.hdf5_libname
+        # if env.hdf5_libname is not None:
+        #     dct['env_hdf5_libname'] = env.hdf5_libname
 
-        if self.hdf5_includedir is not None:
-            dct['cmd_hdf5_includedir'] = self.hdf5_includedir
-        if env.hdf5_includedir is not None:
-            dct['env_hdf5_includedir'] = env.hdf5_includedir
+        # if self.hdf5_includedir is not None:
+        #     dct['cmd_hdf5_includedir'] = self.hdf5_includedir
+        # if env.hdf5_includedir is not None:
+        #     dct['env_hdf5_includedir'] = env.hdf5_includedir
 
-        if self.hdf5_version is not None:
-            dct['cmd_hdf5_version'] = self.hdf5_version
-        if env.hdf5_version is not None:
-            dct['env_hdf5_version'] = env.hdf5_version
+        # if self.hdf5_version is not None:
+        #     dct['cmd_hdf5_version'] = self.hdf5_version
+        # if env.hdf5_version is not None:
+        #     dct['env_hdf5_version'] = env.hdf5_version
 
-        if self.mpi is not None:
-            dct['cmd_mpi'] = self.mpi
-        if env.mpi is not None:
-            dct['env_mpi'] = env.mpi
+        # if self.mpi is not None:
+        #     dct['cmd_mpi'] = self.mpi
+        # if env.mpi is not None:
+        #     dct['env_mpi'] = env.mpi
 
         self.rebuild_required = dct.get('rebuild') or dct != oldsettings
 
@@ -315,47 +369,54 @@ class configure(Command):
 
         # Step 2: update public config attributes according to priority rules
 
-        if self.hdf5 is None:
-            self.hdf5 = oldsettings.get('cmd_hdf5')
-        if self.hdf5 is None:
-            self.hdf5 = env.hdf5
-        if self.hdf5 is None:
-            self.hdf5 = oldsettings.get('env_hdf5')
+        self._update_by_priority('hdf5', oldsettings, env)
+        self._update_by_priority('hdf5_libdir', oldsettings, env)
+        self._update_by_priority('hdf5_libname', oldsettings, env)
+        self._update_by_priority('hdf5_includedir', oldsettings, env)
+        self._update_by_priority('hdf5_version', oldsettings, env)
+        self._update_by_priority('mpi', oldsettings, env)
 
-        if self.hdf5_libdir is None:
-            self.hdf5_libdir = oldsettings.get('cmd_hdf5_libdir')
-        if self.hdf5_libdir is None:
-            self.hdf5_libdir = env.hdf5_libdir
-        if self.hdf5_libdir is None:
-            self.hdf5_libdir = oldsettings.get('env_hdf5_libdir')
+        # if self.hdf5 is None:
+        #     self.hdf5 = oldsettings.get('cmd_hdf5')
+        # if self.hdf5 is None:
+        #     self.hdf5 = env.hdf5
+        # if self.hdf5 is None:
+        #     self.hdf5 = oldsettings.get('env_hdf5')
 
-        if self.hdf5_libname is None:
-            self.hdf5_libname = oldsettings.get('cmd_hdf5_libname')
-        if self.hdf5_libname is None:
-            self.hdf5_libname = env.hdf5_libname
-        if self.hdf5_libname is None:
-            self.hdf5_libname = oldsettings.get('env_hdf5_libname')
+        # if self.hdf5_libdir is None:
+        #     self.hdf5_libdir = oldsettings.get('cmd_hdf5_libdir')
+        # if self.hdf5_libdir is None:
+        #     self.hdf5_libdir = env.hdf5_libdir
+        # if self.hdf5_libdir is None:
+        #     self.hdf5_libdir = oldsettings.get('env_hdf5_libdir')
 
-        if self.hdf5_includedir is None:
-            self.hdf5_includedir = oldsettings.get('cmd_hdf5_includedir')
-        if self.hdf5_includedir is None:
-            self.hdf5_includedir = env.hdf5_includedir
-        if self.hdf5_includedir is None:
-            self.hdf5_includedir = oldsettings.get('env_hdf5_includedir')
+        # if self.hdf5_libname is None:
+        #     self.hdf5_libname = oldsettings.get('cmd_hdf5_libname')
+        # if self.hdf5_libname is None:
+        #     self.hdf5_libname = env.hdf5_libname
+        # if self.hdf5_libname is None:
+        #     self.hdf5_libname = oldsettings.get('env_hdf5_libname')
 
-        if self.hdf5_version is None:
-            self.hdf5_version = oldsettings.get('cmd_hdf5_version')
-        if self.hdf5_version is None:
-            self.hdf5_version = env.hdf5_version
-        if self.hdf5_version is None:
-            self.hdf5_version = oldsettings.get('env_hdf5_version')
+        # if self.hdf5_includedir is None:
+        #     self.hdf5_includedir = oldsettings.get('cmd_hdf5_includedir')
+        # if self.hdf5_includedir is None:
+        #     self.hdf5_includedir = env.hdf5_includedir
+        # if self.hdf5_includedir is None:
+        #     self.hdf5_includedir = oldsettings.get('env_hdf5_includedir')
 
-        if self.mpi is None:
-            self.mpi = oldsettings.get('cmd_mpi')
-        if self.mpi is None:
-            self.mpi = env.mpi
-        if self.mpi is None:
-            self.mpi = oldsettings.get('env_mpi')
+        # if self.hdf5_version is None:
+        #     self.hdf5_version = oldsettings.get('cmd_hdf5_version')
+        # if self.hdf5_version is None:
+        #     self.hdf5_version = env.hdf5_version
+        # if self.hdf5_version is None:
+        #     self.hdf5_version = oldsettings.get('env_hdf5_version')
+
+        # if self.mpi is None:
+        #     self.mpi = oldsettings.get('cmd_mpi')
+        # if self.mpi is None:
+        #     self.mpi = env.mpi
+        # if self.mpi is None:
+        #     self.mpi = oldsettings.get('env_mpi')
 
         if self.hdf5_version is None:
             try:
