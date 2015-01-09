@@ -52,13 +52,14 @@ def validate_version(s):
         raise ValueError("HDF5 version string must be in X.Y.Z format")
 
 
-def autodetect_libdirs(hdf5_libdir=None, mpi=None):
+def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None):
     """
     Detect the lib directories of the wanted hdf5 library.
 
     Intended for Unix-ish platforms (Linux, OS X, BSD).
     Does not support Windows.
 
+    hdf5_dir   : optional HDF5 install directory to look in (containing "lib")
     hdf5_libdir: optional directory where to look for libhdf5
     mpi        : optional switch whether to look for parallel library version
     """
@@ -66,10 +67,9 @@ def autodetect_libdirs(hdf5_libdir=None, mpi=None):
 
     # given parameters get precedence
     if hdf5_libdir is not None:
-        if not hdf5_libdir.endswith('/lib'):
-            libdirs.insert(0, op.join(hdf5_libdir, 'lib'))
-        else:
-            libdirs.insert(0, hdf5_libdir)
+        libdirs = [hdf5_libdir]
+    elif hdf5_dir is not None:
+        libdirs = [op.join(hdf5_dir, 'lib')]
     else:
         try:
             # first try to get information the canonical way
@@ -105,23 +105,23 @@ def autodetect_libdirs(hdf5_libdir=None, mpi=None):
     return libdirs
 
 
-def autodetect_includedirs(hdf5_includedir=None, mpi=None):
+def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None, mpi=None):
     """
     Detect the include directories of the wanted hdf5 library.
 
     Intended for Unix-ish platforms (Linux, OS X, BSD).
     Does not support Windows.
 
-    hdf5_dir: optional HDF5 install directory to look in (containing "include")
-    mpi     : optional switch whether to look for parallel library version
+    hdf5_dir       : optional HDF5 install directory to look in (containing "include")
+    hdf5_includedir: optional directory where to look for libhdf5
+    mpi            : optional switch whether to look for parallel library version
     """
     includedirs = ['/usr/local/include', '/opt/local/include']
 
     if hdf5_includedir is not None:
-        if not hdf5_includedir.endswith('/include'):
-            includedirs.insert(0, op.join(hdf5_includedir, 'include'))
-        else:
-            includedirs.insert(0, hdf5_includedir)
+        includedirs = [hdf5_includedir]
+    elif hdf5_dir is not None:
+        includedirs = [op.join(hdf5_dir, 'include')]
     else:
         if sys.platform.startswith('linux'):
             if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
@@ -202,9 +202,6 @@ def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
             librarypath = op.abspath(op.join(d, candidates[0]))
             break
 
-    if librarypath is None:
-        librarypath = "libhdf5.so"
-
     lib = ctypes.cdll.LoadLibrary(librarypath)
 
     major = ctypes.c_uint()
@@ -232,19 +229,14 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
     hdf5_dir: optional HDF5 install directory to look in (containing "include")
     mpi     : optional switch whether to look for parallel library version
     """
-    if hdf5_libdir is not None:
-        libdirs = autodetect_libdirs(hdf5_libdir, mpi)
-    else:
-        libdirs = autodetect_libdirs(hdf5_dir, mpi)
+
+    libdirs = autodetect_libdirs(hdf5_dir, hdf5_libdir, mpi)
 
     libname, libnameregexp = autodetect_libname(hdf5_libname, mpi)
 
     version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
 
-    if hdf5_includedir is not None:
-        includedirs = autodetect_includedirs(hdf5_includedir, mpi)
-    else:
-        includedirs = autodetect_includedirs(hdf5_dir, mpi)
+    includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, mpi)
 
     return (libdirs, includedirs, version, libname)
 
