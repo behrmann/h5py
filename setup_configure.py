@@ -69,6 +69,12 @@ def autodetect_libdirs(hdf5_dir=None, mpi=None):
             # Debian is multilib so libraries are sorted by their architecture
             debianlibdir = op.join('/usr/lib', platform.uname()[4] + '-linux-gnu')
             libdirs.append(debianlibdir)
+        else:
+            try:
+                 if pkgconfig.exists("hdf5"):
+                     libdirs.append(pkgconfig.parse("hdf5")['library_dirs'].pop())
+            except EnvironmentError:
+                pass
 
     if hdf5_dir is not None:
         libdirs.insert(0, op.join(hdf5_dir, 'lib'))
@@ -93,6 +99,12 @@ def autodetect_includedirs(hdf5_dir=None, mpi=None):
                 includedirs.append('/usr/include/hdf5/openmpi')
             else:
                 includedirs.append('/usr/include/hdf5/serial')
+        else:
+            try:
+                 if pkgconfig.exists("hdf5"):
+                     includedirs.append(pkgconfig.parse("hdf5")['include_dirs'].pop())
+            except EnvironmentError:
+                pass
 
     if hdf5_dir is not None:
         includedirs.insert(0, op.join(hdf5_dir, 'include'))
