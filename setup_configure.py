@@ -330,6 +330,8 @@ class configure(Command):
         print('')
         print("Path to HDF5 library: " + repr(self.hdf5_libdir))
         print("Path to HDF5 headers: " + repr(self.hdf5_includedir))
+        if self.hdf5_libname is not None:
+            print("  HDF5 library names: " + repr(self.hdf5_libname[0] + ".so"))
         print("        HDF5 Version: " + repr(self.hdf5_version))
         print("         MPI Enabled: " + repr(bool(self.mpi)))
         print("    Rebuild Required: " + repr(bool(self.rebuild_required)))
