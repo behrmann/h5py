@@ -253,7 +253,7 @@ class EnvironmentOptions(object):
         self.hdf5_libdir = os.environ.get('HDF5_LIB')
         self.hdf5_libname = os.environ.get('HDF5_LIBNAME')
         self.hdf5_includedir = os.environ.get('HDF5_INCLUDE')
-        self.mpi = os.environ.get('HDF5_MPI')
+        self.mpi = bool(os.environ.get('HDF5_MPI'))
         if self.hdf5_version is not None:
             validate_version(self.hdf5_version)
 
