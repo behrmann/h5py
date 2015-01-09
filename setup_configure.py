@@ -94,8 +94,11 @@ def autodetect_libdirs(hdf5_libdir=None, mpi=None):
             # can be inaccurate, e.g. it does not find mpi-enabled libhdf5
             # on debian systems
             try:
+                import pkgconfig
                 if pkgconfig.exists("hdf5"):
                     libdirs.append(pkgconfig.parse("hdf5")['library_dirs'].pop())
+            except ImportError:
+                pass
             except EnvironmentError:
                 pass
 
@@ -128,8 +131,11 @@ def autodetect_includedirs(hdf5_includedir=None, mpi=None):
                     includedirs = ['/usr/include/hdf5/serial']
             else:
                 try:
+                    import pkgconfig
                     if pkgconfig.exists("hdf5"):
                         includedirs += list(pkgconfig.parse("hdf5")['include_dirs'])
+                except ImportError:
+                    pass
                 except EnvironmentError:
                     pass
 
