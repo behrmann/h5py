@@ -249,6 +249,23 @@ def autodetect_version(libdirs, libnameregexp, mpi=False, hdf5_version=None):
     return version
 
 
+def autodetect_define_macros():
+    '''
+    Get the hdf5 define macros if applicable.
+
+    This function tries to get the define_macros for the hdf5 library from
+    pkgconfig.
+    '''
+    dmacros = None
+    try:
+        import pkgconfig
+        if pkgconfig.exists("hdf5"):
+            dmacros = pkgconfig.parse("hdf5")['define_macros'])
+    except Exception:
+        pass
+    return dmacros
+
+
 def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
                     hdf5_includedir=None, hdf5_version=None, mpi=False):
     """
@@ -269,7 +286,9 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
 
     includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, libdirs, mpi)
 
-    return (libdirs, includedirs, version, libname)
+    macros = autodetect_define_macros()
+
+    return (libdirs, includedirs, version, libname, macros)
 
 
 class EnvironmentOptions(object):
@@ -446,6 +465,7 @@ class configure(Command):
                 self.hdf5_includedir = versioninfo[1]
                 self.hdf5_version = versioninfo[2]
                 self.hdf5_libname = versioninfo[3]
+                self.hdf5_define_macros = versioninfo[4]
                 print("Autodetected HDF5 %s" % self.hdf5_version)
             except Exception as e:
                 sys.stderr.write("Autodetection skipped [%s]\n" % e)
