@@ -97,6 +97,8 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=False):
                 import pkgconfig
                 if pkgconfig.exists("hdf5"):
                     libdirs.append(pkgconfig.parse("hdf5")['library_dirs'])
+                else:
+                    raise Exception
             except Exception:
                 pass
 
@@ -173,6 +175,8 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
             if pkgconfig.exists("hdf5"):
                 pkgc_inc = list(pkgconfig.parse("hdf5")['include_dirs'])
                 includes = pkgc_inc if len(pkg_inc) > 0 else include_search
+            else:
+                raise Exception
         except Exception:
             # in worst case fall back to old default
             includes = include_search
@@ -275,6 +279,8 @@ def autodetect_define_macros():
         import pkgconfig
         if pkgconfig.exists("hdf5"):
             dmacros = pkgconfig.parse("hdf5")['define_macros']
+        else:
+            raise Exception
     except Exception:
         pass
     return dmacros
