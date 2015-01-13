@@ -52,7 +52,7 @@ def validate_version(s):
         raise ValueError("HDF5 version string must be in X.Y.Z format")
 
 
-def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None):
+def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=False):
     """
     Detect the lib directories of the wanted hdf5 library.
 
@@ -103,7 +103,7 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None):
     return libdirs
 
 
-def autodetect_libname(hdf5_libname=None, mpi=None):
+def autodetect_libname(hdf5_libname=None, mpi=False):
     """
     Get namelibrary file of hdf5 library.
 
@@ -139,7 +139,7 @@ def autodetect_libname(hdf5_libname=None, mpi=None):
 
 
 def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
-                           libdirs=None, mpi=None):
+                           libdirs=None, mpi=False):
     """
     Detect the include directories of the wanted hdf5 library.
 
@@ -208,7 +208,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     return includedirs
 
 
-def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
+def autodetect_version(libdirs, libnameregexp, mpi=False, hdf5_version=None):
     """
     Detect the current version of HDF5, and return X.Y.Z version string and path
 
@@ -250,7 +250,7 @@ def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
 
 
 def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
-                    hdf5_includedir=None, hdf5_version=None, mpi=None):
+                    hdf5_includedir=None, hdf5_version=None, mpi=False):
     """
     Detect library and include path as well as version of libhdf5.
 
