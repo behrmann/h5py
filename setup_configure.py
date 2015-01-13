@@ -183,7 +183,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     elif hdf5_dir is not None:
         includedirs = [op.join(hdf5_dir, 'include')]
     elif libdirs is not None:
-        include_search = (lib_to_include(*libdirs) + include_search)
+        include_search = lib_to_include(*libdirs).extend(include_search)
 
         possible_includedirs = []
         for d in include_search:
