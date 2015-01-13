@@ -71,6 +71,7 @@ class h5py_build_ext(build_ext):
         import numpy
 
         settings = COMPILER_SETTINGS.copy()
+
         settings['include_dirs'] += [numpy.get_include()]
         if config.mpi:
             import mpi4py
@@ -86,6 +87,9 @@ class h5py_build_ext(build_ext):
 
         if config.hdf5_libname is not None:
             settings['libraries'] = config.hdf5_libname
+
+        if config.hdf5_define_macros is not None:
+            settings['define_macros'].extend(config.hdf5_define_macros)
 
         # TODO: should this only be done on UNIX?
         if os.name != 'nt':
