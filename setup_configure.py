@@ -144,7 +144,8 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     Detect the include directories of the wanted hdf5 library.
 
     Intended for Unix-ish platforms (Linux, OS X, BSD).
-    Does not support Windows.
+    Does not support Windows. Raises an eror if mpi header files cannot be found,
+    but an mpi-enabled h5py is supposded to be built
 
     hdf5_dir       : optional HDF5 install directory to look in (containing "include")
     hdf5_includedir: optional directory where to look for libhdf5
@@ -183,7 +184,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     elif hdf5_dir is not None:
         includedirs = [op.join(hdf5_dir, 'include')]
     elif libdirs is not None:
-        include_search = lib_to_include(*libdirs).extend(include_search)
+        include_search = (lib_to_include(*libdirs) + include_search)
 
         possible_includedirs = []
         for d in include_search:
@@ -204,6 +205,17 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
             includedirs = fallback_to_pkgconfig(include_search)
     else:
         includedirs = fallback_to_pkgconfig(include_search)
+
+    # Since pkgconfig sometimes as unreliable information we brute force finding
+    # mpi.h, which mpi4py solves by including it in its package
+    if mpi:
+        for d in ['/usr/include', '/usr/local/include', '/opt/local/include']:
+            for dirpath, dirs, files in os.walk(d):
+                if 'mpi.h' in files:
+                    includedirs.append(dirpath)
+                    break
+        else:
+            raise IOError('mpi.h not found, cannot build mpi-enabled h5py!')
 
     return includedirs
 
@@ -260,7 +272,7 @@ def autodetect_define_macros():
     try:
         import pkgconfig
         if pkgconfig.exists("hdf5"):
-            dmacros = pkgconfig.parse("hdf5")['define_macros'])
+            dmacros = pkgconfig.parse("hdf5")['define_macros']
     except Exception:
         pass
     return dmacros
