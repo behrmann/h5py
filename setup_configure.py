@@ -103,43 +103,6 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None):
     return libdirs
 
 
-def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None, mpi=None):
-    """
-    Detect the include directories of the wanted hdf5 library.
-
-    Intended for Unix-ish platforms (Linux, OS X, BSD).
-    Does not support Windows.
-
-    hdf5_dir       : optional HDF5 install directory to look in (containing "include")
-    hdf5_includedir: optional directory where to look for libhdf5
-    mpi            : optional switch whether to look for parallel library version
-    """
-    includedirs = ['/usr/local/include', '/opt/local/include']
-
-    if hdf5_includedir is not None:
-        includedirs = [hdf5_includedir]
-    elif hdf5_dir is not None:
-        includedirs = [op.join(hdf5_dir, 'include')]
-    else:
-        if sys.platform.startswith('linux'):
-            if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
-                if mpi:
-                    includedirs = ['/usr/include/hdf5/openmpi']
-                else:
-                    includedirs = ['/usr/include/hdf5/serial']
-            else:
-                try:
-                    import pkgconfig
-                    if pkgconfig.exists("hdf5"):
-                        includedirs += list(pkgconfig.parse("hdf5")['include_dirs'])
-                except ImportError:
-                    pass
-                except EnvironmentError:
-                    pass
-
-    return includedirs
-
-
 def autodetect_libname(hdf5_libname=None, mpi=None):
     """
     Get namelibrary file of hdf5 library.
@@ -173,6 +136,76 @@ def autodetect_libname(hdf5_libname=None, mpi=None):
             libnameregexp = re.compile(r'^libhdf5.so')
 
     return libname, libnameregexp
+
+
+def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
+                           libdirs=None, mpi=None):
+    """
+    Detect the include directories of the wanted hdf5 library.
+
+    Intended for Unix-ish platforms (Linux, OS X, BSD).
+    Does not support Windows.
+
+    hdf5_dir       : optional HDF5 install directory to look in (containing "include")
+    hdf5_includedir: optional directory where to look for libhdf5
+    libdirs        : optional directories list from autodetect_libdirs
+    mpi            : optional switch whether to look for parallel library version
+    """
+    include_search = ['/usr/local/include', '/opt/local/include']
+
+    def lib_to_include(*libs):
+        try:
+            if sys.version_info >= (3,3,):
+                multiarch = sys.implementation._multiarch
+            else:
+                multiarch = sys._multiarch
+        except AttributeError:
+            multiarch = ''
+        finally:
+            base = [op.dirname(op.normpath(d.rstrip(multiarch))) for d in libs]
+            includes = [op.join(d, 'include') for d in base if op.isdir(d)]
+        return includes
+
+    def fallback_to_pkgconfig(include_search):
+        try:
+            import pkgconfig
+            if pkgconfig.exists("hdf5"):
+                pkgc_inc = list(pkgconfig.parse("hdf5")['include_dirs'])
+                includes = pkgc_inc if len(pkg_inc) > 0 else include_search
+        except Exception:
+            # in worst case fall back to old default
+            includes = include_search
+        return includes
+
+
+    if hdf5_includedir is not None:
+        includedirs = [hdf5_includedir]
+    elif hdf5_dir is not None:
+        includedirs = [op.join(hdf5_dir, 'include')]
+    elif libdirs is not None:
+        include_search = (lib_to_include(*libdirs) + include_search)
+
+        possible_includedirs = []
+        for d in include_search:
+            for dirpath, dirs, files in os.walk(d):
+                if 'hdf5.h' and 'hdf5_hl.h' in files:
+                    possible_includedirs.append(dirpath)
+
+        if len(possible_includedirs) > 1:
+            if mpi:
+                includedirs = [dir for dir in possible_includedirs if
+                               'mpi' in dir]
+            else:
+                includedirs = [dir for dir in possible_includedirs if
+                               not 'mpi' in dir]
+        elif len(possible_includedirs) == 1:
+            includedirs = possible_includedirs
+        else:
+            includedirs = fallback_to_pkgconfig(include_search)
+    else:
+        includedirs = fallback_to_pkgconfig(include_search)
+
+    return includedirs
 
 
 def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
@@ -234,7 +267,7 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
 
     version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
 
-    includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, mpi)
+    includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, libdirs, mpi)
 
     return (libdirs, includedirs, version, libname)
 
