@@ -210,10 +210,12 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     # mpi.h, which mpi4py solves by including it in its package
     if mpi:
         for d in ['/usr/include', '/usr/local/include', '/opt/local/include']:
-            for dirpath, dirs, files in os.walk(d):
-                if 'mpi.h' in files:
+            # Following of links needs to be true since Debian hides the openmpi
+            # header files in weird places
+            for dirpath, dirs, files in os.walk(d, followlinks=True):
+                if 'openmpi' in dirpath and 'mpi.h' in files:
                     includedirs.append(dirpath)
-                    break
+            break
         else:
             raise IOError('mpi.h not found, cannot build mpi-enabled h5py!')
 
