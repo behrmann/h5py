@@ -191,7 +191,6 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
                 if 'hdf5.h' and 'hdf5_hl.h' in files:
                     possible_includedirs.append(dirpath)
 
-        print(possible_includedirs)
         if len(possible_includedirs) > 1:
             if mpi:
                 includedirs = [dir for dir in possible_includedirs if
