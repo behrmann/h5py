@@ -81,12 +81,12 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None):
 
             if sys.platform.startswith('linux'):
                 listswitch = '-p'
-            elif 'freebsd' in sys.platform:
+            elif (sys.platform.startswith('freebsd') or
+                  sys.platform.startswith('darwin')):
                 listswitch = '-r'
 
             ldconfig_out = subprocess.check_output([ldconfigpath, listswitch])
-            ldconfig_out = ldconfig_out.split()
-            libdirs = list(set(op.dirname(line) for line in ldconfig_out
+            libdirs = list(set(op.dirname(line) for line in ldconfig_out.split()
                                if b'libhdf5' in line and op.dirname(line) != b''))
 
         except OSError:
@@ -96,10 +96,8 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None):
             try:
                 import pkgconfig
                 if pkgconfig.exists("hdf5"):
-                    libdirs.append(pkgconfig.parse("hdf5")['library_dirs'].pop())
-            except ImportError:
-                pass
-            except EnvironmentError:
+                    libdirs.append(pkgconfig.parse("hdf5")['library_dirs'])
+            except Exception:
                 pass
 
     return libdirs
