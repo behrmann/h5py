@@ -86,8 +86,10 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=False):
                 listswitch = '-r'
 
             ldconfig_out = subprocess.check_output([ldconfigpath, listswitch])
+            if sys.version_info.major == 3:
+                ldconfig_out = ldconfig_out.decode('utf-8')
             libdirs = list(set(op.dirname(line) for line in ldconfig_out.split()
-                               if b'libhdf5' in line and op.dirname(line) != b''))
+                               if 'libhdf5' in line and op.dirname(line) != ''))
 
         except OSError:
             # try pkgconfig as the last fall back, since its information
@@ -242,7 +244,7 @@ def autodetect_version(libdirs, libnameregexp, mpi=False, hdf5_version=None):
     for d in libdirs:
         try:
             candidates = [x for x in os.listdir(d) if
-                          libnameregexp.match(x.decode('utf-8'))]
+                          libnameregexp.match(x)]
         except Exception:
             continue   # Skip invalid entries
 
