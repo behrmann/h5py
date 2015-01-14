@@ -156,7 +156,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     libdirs        : optional directories list from autodetect_libdirs
     mpi            : optional switch whether to look for parallel library version
     """
-    include_search = ['/usr/local/include', '/opt/local/include']
+    fallback_include = ['/usr/local/include', '/opt/local/include']
 
     def lib_to_include(*libs):
         try:
@@ -167,21 +167,30 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
         except AttributeError:
             multiarch = ''
         finally:
-            base = [op.dirname(op.normpath(d.rstrip(multiarch))) for d in libs]
-            includes = [op.join(d, 'include') for d in base if op.isdir(d)]
+            # this regex matches directory names of the form
+            # /lib
+            # /lib64                    (e.g. Fedora)
+            # /usr/lib/x86_64-linux-gnu (e.g. Debian)
+            # and similar to catch all the places libraries could be and get
+            # appropriate possible include paths
+            regexp = re.compile(r'((lib(\b|\d{2}))|(lib/' +
+                                multiarch +
+                                r'))/?$')
+            base = [re.sub(regexp, r'include', d) for d in libs]
+            includes = [d for d in base if op.isdir(d)]
         return includes
 
-    def fallback_to_pkgconfig(include_search):
+    def fallback_to_pkgconfig(fallback_include):
         try:
             import pkgconfig
             if pkgconfig.exists("hdf5"):
                 pkgc_inc = list(pkgconfig.parse("hdf5")['include_dirs'])
-                includes = pkgc_inc if len(pkg_inc) > 0 else include_search
+                includes = pkgc_inc if len(pkg_inc) > 0 else fallback_include
             else:
                 raise Exception
         except Exception:
             # in worst case fall back to old default
-            includes = include_search
+            includes = fallback_include
         return includes
 
 
@@ -190,7 +199,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     elif hdf5_dir is not None:
         includedirs = [op.join(hdf5_dir, 'include')]
     elif libdirs is not None:
-        include_search = (lib_to_include(*libdirs) + include_search)
+        include_search = (lib_to_include(*libdirs) + fallback_include)
 
         possible_includedirs = []
         for d in include_search:
@@ -208,18 +217,18 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
         elif len(possible_includedirs) == 1:
             includedirs = possible_includedirs
         else:
-            includedirs = fallback_to_pkgconfig(include_search)
+            includedirs = fallback_to_pkgconfig(fallback_include)
     else:
-        includedirs = fallback_to_pkgconfig(include_search)
+        includedirs = fallback_to_pkgconfig(fallback_include)
 
     # Since pkgconfig sometimes as unreliable information we brute force finding
     # mpi.h, which mpi4py solves by including it in its package
     if mpi:
-        for d in ['/usr/include', '/usr/local/include', '/opt/local/include']:
+        for d in ['/include', '/usr/include', '/usr/local/include', '/opt/local/include']:
             # Following of links needs to be true since Debian hides the openmpi
             # header files in weird places
             for dirpath, dirs, files in os.walk(d, followlinks=True):
-                if 'openmpi' in dirpath and 'mpi.h' in files:
+                if 'mpi.h' in files:
                     includedirs.append(dirpath)
             break
         else:
