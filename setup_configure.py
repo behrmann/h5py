@@ -104,6 +104,12 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=False):
             except Exception:
                 pass
 
+    # resolve symlinks so that later we can look for include directories in the
+    # right place.
+    # This is important on Fedora Linux where libs are found in /lib64 which
+    # links to /usr/lib64, but which has only /usr/include but no /include
+    libdirs = [op.realpath(path) for path in libdirs]
+
     return libdirs
 
 
