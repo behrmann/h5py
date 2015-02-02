@@ -24,6 +24,11 @@ import pickle
 import re
 import platform
 
+try
+    import pkgconfig
+except ImportError:
+    FALLBACK=True
+
 
 def loadpickle():
     """ Load settings dict from the pickle file """
@@ -52,7 +57,16 @@ def validate_version(s):
         raise ValueError("HDF5 version string must be in X.Y.Z format")
 
 
-def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=False):
+def hdf5_names_to_try(whichmpi=None):
+    if whichmpi == 'openmpi' or whichmpi == True:
+        return ['hdf5_openmpi','hdf5']
+    elif whichmpi == 'mpich':
+        return ['hdf5_mpich', 'hdf5']
+    else:
+        return ['hdf5_serial', 'hdf5']
+
+
+def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None, fallback=False):
     """
     Detect the lib directories of the wanted hdf5 library.
 
@@ -63,57 +77,56 @@ def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=False):
     hdf5_libdir: optional directory where to look for libhdf5
     mpi        : optional switch whether to look for parallel library version
     """
-    libdirs = ['/usr/local/lib', '/opt/local/lib']
-
     # given parameters get precedence
     if hdf5_libdir is not None:
         libdirs = [hdf5_libdir]
     elif hdf5_dir is not None:
         libdirs = [op.join(hdf5_dir, 'lib')]
     else:
-        try:
-            # first try to get information the canonical way
-            import subprocess
-
-            # get path of ldconfig, e.g.
-            # ldconfig: /sbin/ldconfig /sbin/ldconfig.real /usr/share/man/man8/ldconfig.8.gz
-            ldconfigpath = subprocess.check_output(['whereis', 'ldconfig']).split()[1]
-
-            if sys.platform.startswith('linux'):
-                listswitch = '-p'
-            elif (sys.platform.startswith('freebsd') or
-                  sys.platform.startswith('darwin')):
-                listswitch = '-r'
-
-            ldconfig_out = subprocess.check_output([ldconfigpath, listswitch])
-            if sys.version_info.major == 3:
-                ldconfig_out = ldconfig_out.decode('utf-8')
-            libdirs = list(set(op.dirname(line) for line in ldconfig_out.split()
-                               if 'libhdf5' in line and op.dirname(line) != ''))
-
-        except OSError:
-            # try pkgconfig as the last fall back, since its information
-            # can be inaccurate, e.g. it does not find mpi-enabled libhdf5
-            # on debian systems
+        if fallback:
             try:
-                import pkgconfig
+                # first try to get information the canonical way
+                import subprocess
+
+                # get path of ldconfig, e.g.
+                # ldconfig: /sbin/ldconfig /sbin/ldconfig.real /usr/share/man/man8/ldconfig.8.gz
+                ldconfigpath = subprocess.check_output(['whereis', 'ldconfig']).split()[1]
+
+                if sys.platform.startswith('linux'):
+                    listswitch = '-p'
+                elif (sys.platform.startswith('freebsd') or
+                      sys.platform.startswith('darwin')):
+                    listswitch = '-r'
+
+                ldconfig_out = subprocess.check_output([ldconfigpath, listswitch])
+                if sys.version_info.major == 3:
+                    ldconfig_out = ldconfig_out.decode('utf-8')
+                libdirs = list(set(op.dirname(line) for line in ldconfig_out.split()
+                                   if 'libhdf5' in line and op.dirname(line) != ''))
+
+            except OSError:
+                # try pkgconfig as the last fall back, since its information
+                # can be inaccurate, e.g. it does not find mpi-enabled libhdf5
+                # on debian systems
+                pass
+        else:
+            for package in hdf5_names_to_try(mpi):
                 if pkgconfig.exists("hdf5"):
                     libdirs.append(pkgconfig.parse("hdf5")['library_dirs'])
-                else:
-                    raise Exception
-            except Exception:
-                pass
+                    break
+            else:
+                libdirs = ['/usr/local/lib', '/opt/local/lib']
 
     # resolve symlinks so that later we can look for include directories in the
     # right place.
     # This is important on Fedora Linux where libs are found in /lib64 which
     # links to /usr/lib64, but which has only /usr/include but no /include
-    libdirs = [op.realpath(path) for path in libdirs]
+    libdirs = {op.realpath(path) for path in libdirs}
 
     return libdirs
 
 
-def autodetect_libname(hdf5_libname=None, mpi=False):
+def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
     """
     Get namelibrary file of hdf5 library.
 
@@ -123,33 +136,29 @@ def autodetect_libname(hdf5_libname=None, mpi=False):
     hdf5_dir: optional HDF5 library name
     mpi     : optional switch whether to look for parallel library version
     """
-    if hdf5_libname is not None:
-        libname = [hdf5_libname, hdf5_libname + '_hl']
-        libnameregexp = re.compile(r'lib' + hdf5_libname + r'.so')
-    else:
+    if hdf5_libname is None:
+        hdf5_libname = 'hdf5'
         if sys.platform.startswith('darwin'):
-            libname = None
-            libnameregexp = re.compile(r'^libhdf5.dylib')
-        elif sys.platform.startswith('linux'):
-            if platform.linux_distribution()[0] in ['debian', 'ubuntu']:
-                if mpi:
-                    libname = ['hdf5_openmpi', 'hdf5_openmpi_hl']
-                    libnameregexp = re.compile(r'^libhdf5_openmpi.so')
-                else:
-                    libname = ['hdf5_serial', 'hdf5_serial_hl']
-                    libnameregexp = re.compile(r'^libhdf5_serial.so')
-            else:
-                libname = None
-                libnameregexp = re.compile(r'^libhdf5.so')
+            libextension = r'.dylib'
+        elif sys.platform.startswith('win'):
+            hdf5_libname = 'h5py_hdf5'
+            libextension = r'.dll'
         else:
-            libname = None
-            libnameregexp = re.compile(r'^libhdf5.so')
+            libextension = r'.so'
+    else:
+        if fallback:
+            pass
+        else:
+            pass
+
+    libname = [hdf5_libname, hdf5_libname + '_hl']
+    libnameregexp = re.compile(r'lib' + hdf5_libname + libextension)
 
     return libname, libnameregexp
 
 
 def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
-                           libdirs=None, mpi=False):
+                           libdirs=None, mpi=None):
     """
     Detect the include directories of the wanted hdf5 library.
 
@@ -230,7 +239,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     return includedirs
 
 
-def autodetect_version(libdirs, libnameregexp, mpi=False, hdf5_version=None):
+def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
     """
     Detect the current version of HDF5, and return X.Y.Z version string and path
 
@@ -291,7 +300,7 @@ def autodetect_define_macros():
 
 
 def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
-                    hdf5_includedir=None, hdf5_version=None, mpi=False):
+                    hdf5_includedir=None, hdf5_version=None, mpi=None):
     """
     Detect library and include path as well as version of libhdf5.
 
