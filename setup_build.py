@@ -37,17 +37,17 @@ EXTRA_SRC = {'h5z': [ localpath("lzf/lzf_filter.c"),
 
 if sys.platform.startswith('win'):
     COMPILER_SETTINGS = {
-        'libraries'     : ['h5py_hdf5', 'h5py_hdf5_hl'],
+        'libraries'     : [],
         'include_dirs'  : [localpath('lzf'), localpath('windows')],
         'library_dirs'  : [],
-        'define_macros' : [('H5_USE_16_API', None), ('_HDF5USEDLL_', None)] }
+        'define_macros' : [] }
 
 else:
     COMPILER_SETTINGS = {
-       'libraries'      : ['hdf5', 'hdf5_hl'],
+       'libraries'      : [],
        'include_dirs'   : [localpath('lzf')],
        'library_dirs'   : ['/opt/local/lib', '/usr/local/lib'],
-       'define_macros'  : [('H5_USE_16_API', None)] }
+       'define_macros'  : [] }
 
 
 class h5py_build_ext(build_ext):
