@@ -27,7 +27,7 @@ import platform
 try
     import pkgconfig
 except ImportError:
-    FALLBACK=True
+    NOPKGCONFIG = True
 
 
 def loadpickle():
@@ -357,6 +357,9 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
     mpi     : optional switch whether to look for parallel library version
     """
 
+    if NOPKGCONFIG:
+        fallback = True
+
     libdirs = autodetect_libdirs(hdf5_dir, hdf5_libdir, mpi, fallback)
 
     libname, libnameregexp = autodetect_libname(hdf5_libname, mpi, fallback)
@@ -560,6 +563,10 @@ class configure(Command):
 
         print('*' * 80)
         print(' ' * 23 + "Summary of the h5py configuration")
+        if self.fallback or NOPKGCONFIG:
+            print('Used fallback configuration search.')
+        else:
+            print('Used pkg-config for configuration search.')
         print('')
         print("Path to HDF5 library: " + repr(self.hdf5_libdir))
         print("Path to HDF5 headers: " + repr(self.hdf5_includedir))
