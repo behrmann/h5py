@@ -59,11 +59,11 @@ def validate_version(s):
 
 def hdf5_names_to_try(whichmpi=None):
     if whichmpi == 'openmpi' or whichmpi == True:
-        return ['hdf5_openmpi','hdf5']
+        return ['hdf5-openmpi','hdf5']
     elif whichmpi == 'mpich':
-        return ['hdf5_mpich', 'hdf5']
+        return ['hdf5-mpich', 'hdf5']
     else:
-        return ['hdf5_serial', 'hdf5']
+        return ['hdf5-serial', 'hdf5']
 
 
 def autodetect_libdirs(hdf5_dir=None, hdf5_libdir=None, mpi=None, fallback=False):
@@ -205,13 +205,16 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     def fallback_to_pkgconfig(fallback_include, mpi):
         for package in hdf5_names_to_try(mpi)
             if pkgconfig.exists(package):
-                pkgc_inc = list(pkgconfig.parse(package)['include_dirs'])
+                pkgc_inc = pkgconfig.parse(package)['include_dirs']
                 includes = pkgc_inc if len(pkg_inc) > 0 else fallback_include
                 break
         else:
             includes = fallback_include
+
+
         return includes
 
+    # getting the hdf5 includedir
 
     if hdf5_includedir is not None:
         includedirs = {hdf5_includedir}
@@ -239,6 +242,40 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
             includedirs = fallback_include
     else:
         includedirs = fallback_to_pkgconfig(fallback_include, mpi)
+
+    # getting the mpi4py incluedir
+
+    if mpi:
+        import mpi4py
+        includedirs.add(mpi4py.getinclude())
+
+    # getting the mpi headers
+    # we will assume that we only need to search the mpi headers if we're on
+    # fallback, because it will be pkg-configs job to give us the right headers
+    # in the normal case
+
+    if mpi and fallback:
+        include_search = ['/include', '/usr/include',
+                          '/usr/local/include', '/opt/local/include']
+        mpi_include = set()
+
+        for d in include_search:
+            # Following of links needs to be true since Debian hides the openmpi
+            # header files in weird places
+            for dirpath, dirs, files in os.walk(d, followlinks=True):
+                if 'mpi.h' in files:
+                    mpi_include.add(dirpath)
+                    break
+
+        if len(mpi_include) == 0:
+            raise IOError('mpi.h not found, cannot build mpi-enabled h5py!')
+        else:
+            includedirs.union(mpi_include)
+
+    # getting the numpy headers while we're at it.
+
+    import numpy
+    includedirs.add(numpy.get_include())
 
     includedirs = {op.realpath(path) for path in includedirs}
 

@@ -68,43 +68,15 @@ class h5py_build_ext(build_ext):
         This is the point at which custom directories, MPI options, etc.
         enter the build process.
         """
-        import numpy
-
         settings = COMPILER_SETTINGS.copy()
-
-        settings['include_dirs'] += [numpy.get_include()]
-
-        if config.mpi:
-            import mpi4py
-            settings['include_dirs'] += [mpi4py.get_include()]
-
-            # Since pkgconfig sometimes has unreliable information we brute
-            # force finding mpi.h, which mpi4py solves by including it in its
-            # package
-            include_search = ['/include', '/usr/include',
-                              '/usr/local/include', '/opt/local/include']
-            mpi_include = set()
-
-            for d in include_search:
-                # Following of links needs to be true since Debian hides the openmpi
-                # header files in weird places
-                for dirpath, dirs, files in os.walk(d, followlinks=True):
-                    if 'mpi.h' in files:
-                        mpi_include.add(dirpath)
-                        break
-
-            if len(mpi_include) == 0:
-                raise IOError('mpi.h not found, cannot build mpi-enabled h5py!')
-
-            settings['include_dirs'].extend(mpi_include)
 
         # Ensure a custom location appears first, so we don't get a copy of
         # HDF5 from some default location in COMPILER_SETTINGS
         if config.hdf5_libdir is not None:
-            settings['library_dirs'] += config.hdf5_libdir
+            settings['library_dirs'].extend(config.hdf5_libdir)
 
         if config.hdf5_includedir is not None:
-            settings['include_dirs'] += config.hdf5_includedir
+            settings['include_dirs'].extend(config.hdf5_includedir)
 
         if config.hdf5_libname is not None:
             settings['libraries'] = config.hdf5_libname
