@@ -24,8 +24,9 @@ import pickle
 import re
 import platform
 
-try
+try:
     import pkgconfig
+    NOPKGCONFIG = False
 except ImportError:
     NOPKGCONFIG = True
 
@@ -152,7 +153,7 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
                     hdf5_libnames = pkgconfig.parse(package)['libraries']
                     # filter out the correct library name, relevant for mpi cases
                     for name in hdf5_libnames:
-                        if 'hdf5' is in name:
+                        if 'hdf5' in name:
                             hdf5_libname = name
                     break
             else:
@@ -203,7 +204,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
         return includes
 
     def fallback_to_pkgconfig(fallback_include, mpi):
-        for package in hdf5_names_to_try(mpi)
+        for package in hdf5_names_to_try(mpi):
             if pkgconfig.exists(package):
                 pkgc_inc = pkgconfig.parse(package)['include_dirs']
                 includes = pkgc_inc if len(pkg_inc) > 0 else fallback_include
@@ -322,7 +323,7 @@ def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
     return version
 
 
-def autodetect_define_macros(mpi=None, fallback):
+def autodetect_define_macros(mpi=None, fallback=False):
     '''
     Get the hdf5 define macros if applicable.
 
@@ -346,7 +347,7 @@ def autodetect_define_macros(mpi=None, fallback):
 
 def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
                     hdf5_includedir=None, hdf5_version=None, mpi=None,
-                    fallback=false):
+                    fallback=False):
     """
     Detect library and include path as well as version of libhdf5.
 
