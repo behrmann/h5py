@@ -261,7 +261,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
 
     if mpi:
         import mpi4py
-        includedirs.add(mpi4py.getinclude())
+        includedirs.add(mpi4py.get_include())
 
     # getting the mpi headers
     # we will assume that we only need to search the mpi headers if we're on
@@ -431,7 +431,7 @@ class configure(Command):
                     ('hdf5-libname=', 'n', 'Custom HDF5 library name'),
                     ('hdf5-includedir=', 'i','Custom path to HDF5 include directory'),
                     ('hdf5-version=', '5', 'HDF5 version "X.Y.Z"'),
-                    ('mpi', 'm', 'Enable MPI building'),
+                    ('mpi=', 'm', 'Enable MPI building'),
                     ('reset', 'r', 'Reset config options'),
                     ('fallback', 'f', 'Do not use pkgconfig')]
 
