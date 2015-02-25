@@ -137,16 +137,18 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
     hdf5_dir: optional HDF5 library name
     mpi     : optional switch whether to look for parallel library version
     """
+
+    # getting the name of the librayr
+
+    def fallback_libname():
+        if not sys.platform.startswith('win'):
+            return 'hdf5'
+        else:
+            return 'h5py_hdf5'
+
     if hdf5_libname is None:
         if fallback:
-            hdf5_libname = 'hdf5'
-            if sys.platform.startswith('darwin'):
-                libextension = r'.dylib'
-            elif sys.platform.startswith('win'):
-                hdf5_libname = 'h5py_hdf5'
-                libextension = r'.dll'
-            else:
-                libextension = r'.so'
+            hdf5_libname = fallback_libname()
         else:
             for package in hdf5_names_to_try(mpi):
                 if pkgconfig.exists(package):
@@ -157,7 +159,18 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
                             hdf5_libname = name
                     break
             else:
-                hdf5_libname = 'hdf5'
+                hdf5_libname = fallback_libname()
+
+    # which extension should it have?
+
+    if sys.platform.startswith('darwin'):
+        libextension = r'.dylib'
+    elif sys.platform.startswith('win'):
+        libextension = r'.dll'
+    else:
+        libextension = r'.so'
+
+    # output
 
     libname = [hdf5_libname, hdf5_libname + '_hl']
     libnameregexp = re.compile(r'lib' + hdf5_libname + libextension)
@@ -207,7 +220,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
         for package in hdf5_names_to_try(mpi):
             if pkgconfig.exists(package):
                 pkgc_inc = pkgconfig.parse(package)['include_dirs']
-                includes = pkgc_inc if len(pkg_inc) > 0 else fallback_include
+                includes = pkgc_inc if len(pkgc_inc) > 0 else fallback_include
                 break
         else:
             includes = fallback_include
@@ -365,13 +378,13 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
 
     libname, libnameregexp = autodetect_libname(hdf5_libname, mpi, fallback)
 
-    version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version, fallback)
+    version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
 
     includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, libdirs, mpi, fallback)
 
     macros = autodetect_define_macros(mpi, fallback)
 
-    return (list(libdirs), list(includedirs), list(version), list(libname), list(macros))
+    return (list(libdirs), list(includedirs), version, libname, list(macros))
 
 
 class EnvironmentOptions(object):
