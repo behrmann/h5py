@@ -226,8 +226,6 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
                 break
         else:
             includes = fallback_include
-
-
         return includes
 
     # getting the hdf5 includedir
@@ -245,10 +243,15 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
                 if 'hdf5.h' and 'hdf5_hl.h' in files:
                     possible_includedirs.add(dirpath)
 
+        print(possible_includedirs)
         if len(possible_includedirs) > 1:
-            if mpi:
+            # we use mpich if explicitly asked for, openmpi in any other case
+            if mpi == 'mpich':
                 includedirs = {dir for dir in possible_includedirs if
-                               'mpi' in dir}
+                               'mpich' in dir}
+            elif mpi:
+                includedirs = {dir for dir in possible_includedirs if
+                               'openmpi' in dir}
             else:
                 includedirs = {dir for dir in possible_includedirs if
                                not 'mpi' in dir}
@@ -282,13 +285,15 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
                 if 'mpi.h' in files:
                     mpi_include.add(dirpath)
 
-        if mpi == 'openmpi' or 'mpich':
-            mpi_include = {path for path in mpi_include if mpi in path}
-
         if len(mpi_include) == 0:
             raise IOError('mpi.h not found, cannot build mpi-enabled h5py!')
-        else:
-            includedirs.union(mpi_include)
+        elif len(mpi_include) > 1:
+            if mpi == 'mpich':
+                mpi_include = {path for path in mpi_include if 'mpich' in path}
+            else:
+                mpi_include = {path for path in mpi_include if not 'mpich' in path}
+
+        includedirs = includedirs.union(mpi_include)
 
     # getting the numpy headers while we're at it.
 
@@ -380,17 +385,16 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
     else:
         fallback = bool(fallback)
 
-    print(fallback)
     libdirs = autodetect_libdirs(hdf5_dir, hdf5_libdir, mpi, fallback)
-    print(libdirs)
+
     libname, libnameregexp = autodetect_libname(hdf5_libname, mpi, fallback)
-    print(libname, libnameregexp)
+
     version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
-    print(version)
+
     includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, libdirs, mpi, fallback)
-    print(includedirs)
+
     macros = autodetect_define_macros(mpi, fallback)
-    print(macros)
+
     return (list(libdirs), list(includedirs), version, libname, list(macros))
 
 
@@ -584,6 +588,7 @@ class configure(Command):
 
         print('*' * 80)
         print(' ' * 23 + "Summary of the h5py configuration")
+        print('')
         if self.fallback or NOPKGCONFIG:
             print('Used fallback configuration search.')
         else:
