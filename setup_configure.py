@@ -59,10 +59,11 @@ def validate_version(s):
 
 
 def hdf5_names_to_try(whichmpi=None):
-    if whichmpi == 'openmpi' or whichmpi == True:
-        return ['hdf5-openmpi','hdf5']
-    elif whichmpi == 'mpich':
+    # choose mpich if it is explicitly requested, choose openmpi else for mpi
+    if whichmpi == 'mpich':
         return ['hdf5-mpich', 'hdf5']
+    elif whichmpi:
+        return ['hdf5-openmpi','hdf5']
     else:
         return ['hdf5-serial', 'hdf5']
 
@@ -140,15 +141,16 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
 
     # getting the name of the librayr
 
-    def fallback_libname():
+    def fallback_libname(mpi):
+        libname = hdf5_names_to_try(mpi)[0].replace('-','_')
         if not sys.platform.startswith('win'):
-            return 'hdf5'
+            return libname
         else:
-            return 'h5py_hdf5'
+            return 'h5py_' + libname
 
     if hdf5_libname is None:
         if fallback:
-            hdf5_libname = fallback_libname()
+            hdf5_libname = fallback_libname(mpi)
         else:
             for package in hdf5_names_to_try(mpi):
                 if pkgconfig.exists(package):
@@ -159,7 +161,7 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
                             hdf5_libname = name
                     break
             else:
-                hdf5_libname = fallback_libname()
+                hdf5_libname = fallback_libname(mpi)
 
     # which extension should it have?
 
@@ -212,8 +214,8 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
             regexp = re.compile(r'((lib(\b|\d{2}))|(lib/' +
                                 multiarch +
                                 r'))/?$')
-            base = [re.sub(regexp, r'include', d) for d in libs]
-            includes = [d for d in base if op.isdir(d)]
+            base = (re.sub(regexp, r'include', d) for d in libs)
+            includes = {d for d in base if op.isdir(d)}
         return includes
 
     def fallback_to_pkgconfig(fallback_include, mpi):
@@ -235,9 +237,9 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     elif hdf5_dir is not None:
         includedirs = {op.join(hdf5_dir, 'include')}
     elif fallback and libdirs is not None:
-        include_search = (lib_to_include(*libdirs) + fallback_include)
+        include_search = lib_to_include(*libdirs).union(fallback_include)
 
-        possible_includedirs = {}
+        possible_includedirs = set()
         for d in include_search:
             for dirpath, dirs, files in os.walk(d):
                 if 'hdf5.h' and 'hdf5_hl.h' in files:
@@ -279,7 +281,9 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
             for dirpath, dirs, files in os.walk(d, followlinks=True):
                 if 'mpi.h' in files:
                     mpi_include.add(dirpath)
-                    break
+
+        if mpi == 'openmpi' or 'mpich':
+            mpi_include = {path for path in mpi_include if mpi in path}
 
         if len(mpi_include) == 0:
             raise IOError('mpi.h not found, cannot build mpi-enabled h5py!')
@@ -343,7 +347,7 @@ def autodetect_define_macros(mpi=None, fallback=False):
     This function tries to get the define_macros for the hdf5 library from
     pkgconfig.
     '''
-    dmacros = None
+    dmacros = set()
 
     if not fallback:
         for package in hdf5_names_to_try(mpi):
@@ -373,17 +377,20 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
 
     if NOPKGCONFIG:
         fallback = True
+    else:
+        fallback = bool(fallback)
 
+    print(fallback)
     libdirs = autodetect_libdirs(hdf5_dir, hdf5_libdir, mpi, fallback)
-
+    print(libdirs)
     libname, libnameregexp = autodetect_libname(hdf5_libname, mpi, fallback)
-
+    print(libname, libnameregexp)
     version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
-
+    print(version)
     includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, libdirs, mpi, fallback)
-
+    print(includedirs)
     macros = autodetect_define_macros(mpi, fallback)
-
+    print(macros)
     return (list(libdirs), list(includedirs), version, libname, list(macros))
 
 
@@ -583,9 +590,9 @@ class configure(Command):
             print('Used pkg-config for configuration search.')
         print('')
         print("Path to HDF5 library: " + repr(self.hdf5_libdir))
-        print("Path to HDF5 headers: " + repr(self.hdf5_includedir))
+        print("  Using headers from: " + repr(self.hdf5_includedir))
         if self.hdf5_libname is not None:
-            print("  HDF5 library names: " + repr(self.hdf5_libname[0]))
+            print("   HDF5 library name: " + repr(self.hdf5_libname[0]))
         print("        HDF5 Version: " + repr(self.hdf5_version))
         print("         MPI Enabled: " + repr(bool(self.mpi)))
         print("    Rebuild Required: " + repr(bool(self.rebuild_required)))
