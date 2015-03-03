@@ -142,11 +142,11 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
     # getting the name of the librayr
 
     def fallback_libname(mpi):
-        libname = hdf5_names_to_try(mpi)[0].replace('-','_')
+        libname = [name.replace('-','_') for name in hdf5_names_to_try(mpi)
         if not sys.platform.startswith('win'):
             return libname
         else:
-            return 'h5py_' + libname
+            return ['h5py_' + name for name in libname]
 
     if hdf5_libname is None:
         if fallback:
@@ -172,12 +172,9 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
     else:
         libextension = r'.so'
 
-    # output
-
-    libname = [hdf5_libname, hdf5_libname + '_hl']
-    libnameregexp = re.compile(r'lib' + hdf5_libname + libextension)
-
-    return libname, libnameregexp
+    return [([hdf5_libname, hdf5_libname + '_hl'],
+             re.compile(r'lib' + hdf5_libname + libextension)) for
+            name in hdf5_libname]
 
 
 def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
@@ -305,7 +302,7 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
     return includedirs
 
 
-def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
+def autodetect_version(libdirs, libnames, mpi=None, hdf5_version=None):
     """
     Detect the current version of HDF5, and return X.Y.Z version string and path
 
@@ -318,16 +315,25 @@ def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
     import ctypes
     from ctypes import byref
 
-    for d in libdirs:
-        try:
-            candidates = [x for x in os.listdir(d) if libnameregexp.match(x)]
-        except Exception:
-            continue   # Skip invalid entries
+    libname = None
 
-        if len(candidates) != 0:
-            candidates.sort(key=lambda x: len(x))   # Prefer libfoo.so to libfoo.so.X.Y.Z
-            librarypath = op.abspath(op.join(d, candidates[0]))
+    for d in libdirs:
+        for name, regex in libnames:
+            try:
+                candidates = [x for x in os.listdir(d) if regex.match(x)]
+            except Exception:
+                continue   # Skip invalid entries
+
+            if len(candidates) != 0:
+                candidates.sort(key=lambda x: len(x))   # Prefer libfoo.so to libfoo.so.X.Y.Z
+                librarypath = op.abspath(op.join(d, candidates[0]))
+                libname = name
+                break
+
+        if libname:
             break
+    else:
+        raise ValueError('Could not find HDF5 library!')
 
     lib = ctypes.cdll.LoadLibrary(librarypath)
 
@@ -342,7 +348,7 @@ def autodetect_version(libdirs, libnameregexp, mpi=None, hdf5_version=None):
     if hdf5_version is not None and not sys.platform.startswith('win'):
         assert hdf5_version == version
 
-    return version
+    return version, libname
 
 
 def autodetect_define_macros(mpi=None, fallback=False):
@@ -387,9 +393,9 @@ def autodetect_hdf5(hdf5_dir=None, hdf5_libdir=None, hdf5_libname=None,
 
     libdirs = autodetect_libdirs(hdf5_dir, hdf5_libdir, mpi, fallback)
 
-    libname, libnameregexp = autodetect_libname(hdf5_libname, mpi, fallback)
+    libnames = autodetect_libname(hdf5_libname, mpi, fallback)
 
-    version = autodetect_version(libdirs, libnameregexp, mpi, hdf5_version)
+    version, libname = autodetect_version(libdirs, libnames, mpi, hdf5_version)
 
     includedirs = autodetect_includedirs(hdf5_dir, hdf5_includedir, libdirs, mpi, fallback)
 
