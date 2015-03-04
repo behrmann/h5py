@@ -142,7 +142,7 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
     # getting the name of the librayr
 
     def fallback_libname(mpi):
-        libname = [name.replace('-','_') for name in hdf5_names_to_try(mpi)
+        libname = [name.replace('-','_') for name in hdf5_names_to_try(mpi)]
         if not sys.platform.startswith('win'):
             return libname
         else:
@@ -172,8 +172,7 @@ def autodetect_libname(hdf5_libname=None, mpi=None, fallback=False):
     else:
         libextension = r'.so'
 
-    return [([hdf5_libname, hdf5_libname + '_hl'],
-             re.compile(r'lib' + hdf5_libname + libextension)) for
+    return [([name, name + '_hl'], re.compile(r'lib' + name + libextension)) for
             name in hdf5_libname]
 
 
@@ -240,7 +239,6 @@ def autodetect_includedirs(hdf5_dir=None, hdf5_includedir=None,
                 if 'hdf5.h' and 'hdf5_hl.h' in files:
                     possible_includedirs.add(dirpath)
 
-        print(possible_includedirs)
         if len(possible_includedirs) > 1:
             # we use mpich if explicitly asked for, openmpi in any other case
             if mpi == 'mpich':
